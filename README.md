@@ -42,3 +42,7 @@ pwd
 11. Install 'requests' python package
 pip install requests
 12. Make use of sample playbooks provided to get started
+
+
+# Related Project
+Ansible with OnCommand API Services for Element based NetApp storage management. Look https://github.com/NetApp/Ansible-with-OnCommand-API-Services/
