@@ -38,7 +38,7 @@ cd modules
 8. Run Command:
 pwd
 9. Verify that the output is "/root/modules"
-10. Now download all the modules from ‘modules/NetApp Service Level Manager’ inside "/root/modules"(download these modules from NetApp Service Level Manager to either Master Ansible server or the Slave Ansible servers)
+10. Now download all the modules from ‘modules/NetApp Service Level Manager’ inside "/root/modules"(download these modules to either Master Ansible server or the Slave Ansible servers)
 11. Install 'requests' python package
 pip install requests
 12. Make use of sample playbooks provided to get started
