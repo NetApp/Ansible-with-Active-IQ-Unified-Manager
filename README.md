@@ -46,3 +46,6 @@ pip install requests
 
 # Related Project
 Ansible with OnCommand API Services for Element based NetApp storage management. Look https://github.com/NetApp/Ansible-with-OnCommand-API-Services/
+
+# Support
+Please enter an issue if you would like to report a defect
