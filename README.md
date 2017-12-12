@@ -24,6 +24,7 @@ The functionality of these modules is to act as an interface between Ansible and
 
 # Configuration
 1. Get a working Ansible Setup (rhel-7 or centos-7)
+3. Get a working NetApp Service Level Manager Setup
 2. Sign-in as root at the Ansible Master machine and the Ansible Slave servers
 3. Edit the ansible.cfg file to edit the ansible modules library folder. Run command:
 vi /etc/ansible/ansible.cfg
