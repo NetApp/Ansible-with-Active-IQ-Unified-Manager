@@ -1,3 +1,45 @@
-# Ansible-with-NetApp-Service-Level-Manager
-Repository for Ansible modules for integration with NetApp's Service Level Manager
-test commit
+# Ansible with NetApp Service Level Manager
+
+This pack contains Ansible modules and sample playbooks which enables you to configure service level based NetApp storage management using NetApp Service Level Manager. Ansible behaves as the orchestrator tool.
+
+# Disclaimer
+These Ansible modules and sample playbooks are written as best effort and provide no warranties or SLAs, expressed or implied.
+
+# Repository includes:
+1.	Ansible NetApp Service Level Manager Modules
+2.	Sample Playbooks
+3.	README
+ 
+# Supported configurations:
+•	Control server distros 
+o	RHEL 7.x
+o	CentOS 7.x
+•	NetApp Service Level Manager - 1.0RC3
+•	Minimum ONTAP version - ONTAP 9.x
+
+# Overview
+These Ansible Modules will help you configure service level based NetApp storage management using NetApp Service Level Manager.
+
+These modules can be downloaded on your ansible server using the configuration steps below. Once these modules are configured, they can be used in custom written playbook according to specific use cases or requirements.
+The functionality of these modules is to act as an interface between Ansible and NetApp Service Level Manager. With these modules the commands given at the Ansible server will be translated to RESTful api calls to NetApp Service Level Manager and communicated back.
+
+
+# Configuration
+•	Get a working Ansible Setup (rhel-7 or centos-7)
+•	Sign-in as root at the Ansible Master machine and the Ansible Slave servers
+•	Edit the ansible.cfg file to edit the ansible modules library folder. Run command:
+vi /etc/ansible/ansible.cfg
+•	Find the commented line for library default value. Remove the # sign from start of the line. Edit it to
+library = /root/modules
+•	At the Ansible server, sign-in with root privileges
+•	Create a new directory. Command:
+mkdir modules
+•	Run Command:
+cd modules
+•	Run Command:
+pwd
+Verify that the output is "/root/modules"
+•	Now download all the modules from ‘modules/NetApp Service Level Manager’ inside "/root/modules"(download these modules from NetApp Service Level Manager to either Master Ansible server or the Slave Ansible servers)
+•	Install 'requests' python package
+pip install requests
+•	Make use of sample playbooks provided to get started
