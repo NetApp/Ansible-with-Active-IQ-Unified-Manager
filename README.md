@@ -48,4 +48,4 @@ pip install requests
 Ansible with OnCommand API Services for Element based NetApp storage management. Look https://github.com/NetApp/Ansible-with-OnCommand-API-Services/
 
 # Support
-Please enter an issue if you would like to report a defect
+Please enter an issue (https://github.com/NetApp/Ansible-with-NetApp-Service-Level-Manager/issues) if you would like to report a defect
