@@ -1,0 +1,22 @@
+- hosts: localhost
+  tasks:
+    - name: Get Lun 'test123'
+      LunModule: host=<<nslm or apis server-ip>> port=8443 user=<<admin>> password=<<password>> action=get name=test123
+      register : jsonResult
+
+    - name: print the Lun key
+      debug: msg="{{ jsonResult.meta.result.records[0].key}}"
+
+    - name: Get key and Edit Lun 'test123'
+      LunModule: host=<<nslm or apis server-ip>> port=8443 user=<<admin>> password=<<password>> action=put size=3004803008 key={{ jsonResult.meta.result.records[0].key}}
+      register : jsonResult
+
+    - name: print the job key
+      debug : msg="{{ jsonResult.meta.result.records[0].key}}"
+
+    - name: loop for status
+      JobScheduleModule: host=<<nslm or apis server-ip>> port=8443 user=<<admin>> password=<<password>> action=get key={{ jsonResult.meta.result.records[0].key}}
+      register : jsonResult
+      until:  (jsonResult.meta.result.records[0].status == "COMPLETED") or (jsonResult.meta.result.records[0].status == "FAILED")
+      retries: 5
+      delay: 10

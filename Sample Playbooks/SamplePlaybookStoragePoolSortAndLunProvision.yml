@@ -1,0 +1,63 @@
+- hosts: localhost
+  tasks:
+    - name: Get Storage Pools sorted by allocatable iops
+      StoragePoolModule: host=<<nslm or apis server-ip>> port=8443 user=<<admin>> password=<<password>> action=get sortBy=allocatable_iops
+      register : jsonResult
+
+    - name: Print the storage pool key
+      debug: msg="{{ jsonResult.meta.result.records[jsonResult.meta.result.total_records-1].key }}"
+
+    - name: Print supported SSL
+      vars:
+          sslKey: "{{ jsonResult.meta.result.records[jsonResult.meta.result.total_records-1].supported_storage_service_level_keys[0] }}"
+      shell : echo {{sslKey}}
+      register: sslKey2
+
+
+    - name: Get all Storage VMs
+      StorageVMModule: host=<<nslm or apis server-ip>> port=8443 user=<<admin>> password=<<password>> action=get
+      register: jsonResultforSVMs
+
+    - name: debugging
+      debug: msg={{sslKey2.stdout}}
+
+    - name: Display all ssl keys and match with existing ssl key
+      with_items : "{{ jsonResultforSVMs | json_query(string_query) }}"
+      vars:
+
+          SSLkey : "{{sslKey2.stdout}}"
+          string_query : "meta.result.records[?supported_storage_service_level_keys[?'{{SSLkey}}']].key"
+
+      shell : echo "{{ item }}"
+      register: listItems
+
+
+    - name: provision
+      vars:
+          vmkey : "{{listItems.results[0].item}}"
+      LunModule:
+          host=<<nslm or apis server-ip>> 
+          port=8443 
+          user=<<admin>> 
+          password=<<password>>
+          action=post
+          name=ansibleLun
+          size=104803008
+          storage_vm_key={{vmkey}}
+          storage_service_level_key={{ jsonResult.meta.result.records[jsonResult.meta.result.total_records-1].supported_storage_service_level_keys[0] }}
+          storage_pool_key={{ jsonResult.meta.result.records[jsonResult.meta.result.total_records-1].key }}
+      register: jsonResultforJob
+
+
+    - name: print the previous result
+      debug: msg="{{ jsonResultforJob }}"
+
+    - name: print the job key
+      debug : msg="{{ jsonResultforJob.meta.result.records[0].key}}"
+
+    - name: loop for status
+      JobScheduleModule: host=<<nslm or apis server-ip>> port=8443 user=<<admin>> password=<<password>> action=get key={{ jsonResultforJob.meta.result.records[0].key }}
+      register : jsonResult
+      until:  (jsonResult.meta.result.records[0].status == "COMPLETED") or (jsonResult.meta.result.records[0].status == "FAILED")
+      retries: 5
+      delay: 10
