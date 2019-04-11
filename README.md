@@ -29,19 +29,32 @@ You can download the modules on your Ansible server using the following configur
  ## Steps
 1.	Log in as root at both the Ansible Master machine and the Ansible Slave servers.
 2.	To modify the Ansible modules library folder, edit the ansible.cfg file using the command:
-```vi /etc/ansible/ansible.cfg```
+```
+vi /etc/ansible/ansible.cfg
+```
 3.	Find the commented line for the library default value; remove the # sign from start of the line and change it to:
-```library = /root/modules```
+```
+library = /root/modules
+```
 4.	Log in as root at the Ansible server.
 5.	Create a directory using the command:
-```mkdir modules```
+```
+mkdir modules
+```
 6.	Run the command:
-```cd modules```
+```
+cd modules
+```
 7.	Run the command:
-```pwd```
+```
+pwd
+```
 8.	Verify that the output is:
-```/root/modules```
+```
+/root/modules
+```
 9.	In "/root/modules”, download all modules from “modules/NetApp Service Level Manager”. 
+
 **Note:** You can download these modules to either of the Master Ansible servers.
 10.	Install the “requests” Python package PIP install requests.
 11.	Use the sample playbooks provided to get started.
@@ -49,7 +62,9 @@ You can download the modules on your Ansible server using the following configur
 
 # Module Documentation
 You can access documentation for each module using the Ansible standard doc command.
-```ansible-doc nslm_luns.py```
+```
+ansible-doc nslm_luns.py
+```
 
 # Support
 Report any problems to: https://github.com/NetApp/Ansible-with-NetApp-Service-Level-Manager/issues
