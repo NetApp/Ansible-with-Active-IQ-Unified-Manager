@@ -53,9 +53,10 @@ pwd
 ```
 /root/modules
 ```
-9.	In "/root/modules”, download all modules from “modules/NetApp Service Level Manager”. 
+9.	In "/root/modules”, download all modules from “NetApp/Ansible-with-NetApp-Service-Level-Manager”. 
 
 **Note:** You can download these modules to either of the Master Ansible servers.
+
 10.	Install the “requests” Python package PIP install requests.
 11.	Use the sample playbooks provided to get started.
 
