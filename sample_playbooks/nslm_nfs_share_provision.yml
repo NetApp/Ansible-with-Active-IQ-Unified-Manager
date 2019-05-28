@@ -1,0 +1,46 @@
+- hosts: localhost
+# Make sure NSLM credentials are updated in nslm_credentials.yml file before trying this playbook
+  vars_files: nslm_credentials.yml
+  vars:
+      psl: <performance_servive_level>
+      cluster: <cluster_name>
+      svm: <svm_name>
+      state: present # Possible values are present,absent
+      filesharename: <name_of_the_file_share>
+      filesharesize: <size_of_the_file_share>
+      sizeunit: MB # Possible values are MB,KB,GB,TB
+      mountpoint: <file_share_mount_point>
+      allowed_clients: <comma_separated_list_of_ip_addresses>
+      index: <index_no>
+      nfsv3: true # Possible values are true, false
+      nfsv4: true # Possible values are true, false
+      read_only_rule: <list_of_comma_separated_values> # Possible values are from SYS,NTLM,KERBEROS5,KERBEROS5I,KERBEROS5P,NONE,NEVER,ANY
+      read_write_rule: <list_of_comma_separated_values> # Possible values are from SYS,NTLM,KERBEROS5,KERBEROS5I,KERBEROS5P,NONE,NEVER,ANY
+
+
+  tasks:
+    - name: Manage a NFS Share with specified Performance Service Level by the name
+      nslm_file_shares:
+        state={{ state }}
+        hostip={{ nslmIP }}
+        port={{ nslmPort }}
+        user={{ nslmUser }}
+        password={{ nslmPassword }}
+        cluster={{ cluster }}
+        svm={{ svm }}
+        performance_service_level={{ psl }}
+        name={{ filesharename }}
+        capacity={{ filesharesize }}
+        capacity_unit={{ sizeunit }}
+        mountpoint={{ mountpoint }}
+        allowed_clients={{ allowed_clients }}
+        index={{ index }}
+        nfsv3={{ nfsv3 }}
+        nfsv4={{ nfsv4 }}
+        read_only_rule={{ read_only_rule }}
+        read_write_rule={{ read_write_rule }}
+      no_log: true
+      register: fileshareCreate
+
+    - name: Print the state of the operation
+      debug: msg="Creation/Updation of FileShare in specified PSL {{fileshareCreate["meta"]["state"]}}"
