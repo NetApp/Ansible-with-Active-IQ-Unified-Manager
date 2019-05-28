@@ -137,7 +137,7 @@ class NetAppNSLMLicenses(object):
         if  data != None :
             payload['data']=data
         response = requests.post(server_details + url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def delete(self):
@@ -153,7 +153,7 @@ class NetAppNSLMLicenses(object):
             payload['data']=data
         url_path += "/" + uuid
         response = requests.put(server_details + url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
     def apply(self):
         # Actions
@@ -161,14 +161,12 @@ class NetAppNSLMLicenses(object):
             if exist():
                 response = self.delete()
                 parse_state_response(response)
-            else:
-                module.exit_json(changed=False,meta="Either the License has been already deleted or Please provide a valid License uuid")
         elif module.params["state"] == PRESENT:
-            if exist():
-                response=self.put()
+            if is_default_license():
+                response=self.post()
                 parse_state_response(response)
             else:
-                response=self.post()
+                response=self.put()
                 parse_state_response(response)
 
 def exist ():
@@ -217,16 +215,34 @@ def get_resource_uuid(url):
     if response.status_code==200:
         response_json = response.json()
         if response_json.get('num_records') == 0:
-            return None
-        else:
-            embedded = response_json.get('_embedded')
-            for record in embedded['netapp:records']:
-                resource_key = record.get('uuid')
-                return resource_key
+            return True
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            resource_key = record.get('uuid')
+            return resource_key
     else:
         # Returning error message received from NSLM
         module.exit_json(changed=False,meta=response.json())
 
+def is_default_license():
+    global uuid
+    url = server_details + url_path
+    response = requests.get(url, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
+    if response.status_code==200:
+        response_json = response.json()
+        if response_json.get('num_records') == 0:
+            return True
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            package = record.get('package')
+            if package == 'SLO_INBUILT':
+                return True
+            else:
+                uuid = record.get('uuid')
+                return False
+    else:
+        # Returning error message received from NSLM
+        module.exit_json(changed=False,meta=response.json())
 
 def main():
     """Apply license operations from playbook"""

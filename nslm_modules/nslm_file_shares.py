@@ -26,7 +26,7 @@ options:
     state_supported: present
     acl:
       description:
-      - List of CIFS share access controls. Modifiable field.
+      - List of CIFS share access controls. In order to provide multiple access controls, permission and user_or_group should be multi valued(as many as access controls) separated by comma. Please refer the example given below. Modifiable field.
       required: false
       state_supported: present
       permission:
@@ -37,7 +37,7 @@ options:
         state_supported: present
       user_or_group:
         description:
-	- User or group of the Active Directory to provide access. To provide access to everyone, use 'everyone' as the input. Modifiable field.
+        - User or group of the Active Directory to provide access. To provide access to everyone, use 'everyone' as the input. Modifiable field.
         required: false
         state_supported: present
     attach_active_directory:
@@ -52,7 +52,7 @@ options:
       state_supported: present
       rules:
         description:
-        - List of export rules. Modifiable field.
+        - List of export rules. In order to specify multiple export rules, parameters- cifs, nfsv3, nfsv4 should be single valued as the same value will be repeated for all the rules. Parameter- index should be multi valued(as many as rules) separated by comma. Parameters: allowed_clients, read_only_rule and read_write_rule should be multi valued with two separaters, semicolon to separate two lists/strings and comma to separate elements in list/string. Please refer the example given below. Modifiable field.
         required: false
         state_supported: present
         allowed_clients:
@@ -104,8 +104,8 @@ options:
     state_supported: present
   capacity_unit:
     description:
-    - Capacity unit used to interpret the capacity parameter. Modifiable field.
-    choices: ['mb', 'gb', 'tb', 'pb', 'eb', 'zb', 'yb']
+    - Capacity unit used to interpret the capacity parameter, default is MB. Modifiable field.
+    choices: ['MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
     required: false
     state_supported: present
   cluster:
@@ -155,11 +155,36 @@ EXAMPLES = '''
         password=<nslm_password>
         state=present
         name=demo_fileshare_ansible
+        capacity=5
+        capacity_unit=GB
+        performance_service_level=Value
+        svm=demo_vserver
+        cluster=netapp-aff300-01-02
+        mountpoint: /demo_fileshare_ansible
+        cifs=false
+        nfsv3=true
+        nfsv4=true
+        index=5,6,7
+        allowed_clients=10.12.13.14,10.11.22.65;10.11.22.33;10.32.43.54,10.21.31.41
+        read_only_rule=SYS,NEVER;NTLM,ANY;KERBEROS5P
+        read_write_rule=SYS,NONE;ANY;KERBEROS5P
+      register : jsonResult
+
+    - name: Manage file-share
+      nslm_file_shares:
+        hostip=<nslm_hostip>
+        port=<nslm_portnumber>
+        user=<nslm_username>
+        password=<nslm_password>
+        state=present
+        name=demo_fileshare_ansible
         capacity=500
         performance_service_level=Value
         svm=demo_vserver
         cluster=netapp-aff300-01-02
         mountpoint: /demo_fileshare_ansible
+        user_or_group=CTLAdmin,EVERYONE
+        permission=READ,NO_ACCESS
       register : jsonResult
 
 '''
@@ -195,13 +220,13 @@ class NetAppNSLMFileshares(object):
     def __init__(self):
         """Initialize module parameters"""
         self._capacity_unit_map = dict(
-            mb=1,
-            gb=1024,
-            tb=1024 ** 2,
-            pb=1024 ** 3,
-            eb=1024 ** 4,
-            zb=1024 ** 5,
-            yb=1024 ** 6
+            MB=1,mb=1,
+            GB=1024,gb=1024,
+            TB=1024 ** 2,tb=1024 ** 2,
+            PB=1024 ** 3,pb=1024 ** 3,
+            EB=1024 ** 4,eb=1024 ** 4,
+            ZB=1024 ** 5,zb=1024 ** 5,
+            YB=1024 ** 6,yb=1024 ** 6
         )
         fields = {
             'state': {
@@ -217,12 +242,12 @@ class NetAppNSLMFileshares(object):
             'allowed_clients': {'required': False, 'type': 'str'},
             "capacity" : {"required": False, "type": "float"},
             "capacity_unit" : {"required": False,
-                               "choices": ['mb', 'gb', 'tb', 'pb', 'eb', 'zb', 'yb'],
+                               "choices": ['MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB', 'mb', 'gb', 'tb', 'pb', 'eb', 'zb', 'yb'],
                                "type": 'str'
                                },
             'cifs': {'required': False, 'type': 'bool'},
             'cluster': {'required': True, 'type': 'str'},
-            'index': {'required': False, 'type': 'int'},
+            'index': {'required': False, 'type': 'list'},
             'mountpoint': {'required': False, 'type': 'str'},
             'name': {'required': True, 'type': 'str'},
             'nfsv3': {'required': False, 'type': 'bool'},
@@ -232,13 +257,13 @@ class NetAppNSLMFileshares(object):
                                   'type': 'str'
                                  },
             'performance_service_level': {'required': False, 'type': 'str'},
-            'permission': {'required': False, 'type': 'str'},
-            'read_only_rule': {'required': False, 'type': 'list'},
-            'read_write_rule': {'required': False, 'type': 'list'},
+            'permission': {'required': False, 'type': 'list'},
+            'read_only_rule': {'required': False, 'type': 'str'},
+            'read_write_rule': {'required': False, 'type': 'str'},
             'storage_efficiency_policy': {'required': False, 'type': 'str'},
             'attach_active_directory': {'required': False, 'type': 'bool'},
             'svm': {'required': True, 'type': 'str'},
-            'user_or_group': {'required': False, 'type': 'str'},
+            'user_or_group': {'required': False, 'type': 'list'},
         }
 
         global module
@@ -287,6 +312,7 @@ class NetAppNSLMFileshares(object):
         global capacity_in_mb
         global capacity_unit
         global cluster
+        global cluster_key
         global cifs
         global fail_response
         global index
@@ -336,20 +362,20 @@ class NetAppNSLMFileshares(object):
     def post(self):
         global url_path
         global resource_url_path
+        global cluster_key
         access_control={}
         acl=[]
         acl_payload={}
         export_policy={}
         rules=[]
-        rules_payload={}
         read_only_rule_list=[]
         read_write_rule_list=[]
-	payload={}
+        payload={}
 
-	if capacity != None:
-	    payload['capacity_in_mb']=capacity_in_mb
-	if mountpoint != None:
-	    payload['mountpoint']=mountpoint
+        if capacity != None:
+            payload['capacity_in_mb']=capacity_in_mb
+        if mountpoint != None:
+            payload['mountpoint']=mountpoint
         if name != None:
             payload['name']=name
         if cluster != None:
@@ -358,35 +384,21 @@ class NetAppNSLMFileshares(object):
             if cluster_key == None:
                 module.exit_json(changed=False,meta="Please provide a valid Cluster name.")
         if svm != None:
-            if cluster != None:
-                url_cluster = server_details + resource_url_path +  "clusters?name=" + cluster
-                cluster_key = get_resource_key(url_cluster)
-                if cluster_key == None:
-                    module.exit_json(changed=False,meta="Please provide a valid Cluster name.")
-            else:
-                    module.exit_json(changed=False,meta="Please provide a Cluster name.")
-            url_svm = server_details + resource_url_path +  "svms?cluster_key=" + cluster_key
-            svm_key = parse_for_resource_key(url_svm, svm)
+            url_svm = server_details + resource_url_path +  "svms?cluster_key=" + cluster_key + "&filter=name eq " + svm
+            svm_key = get_resource_key(url_svm)
             if svm_key ==None:
                 module.exit_json(changed=False,meta="Please provide a valid SVM name.")
             payload['svm_key']= svm_key
         if attach_active_directory != None and attach_active_directory == True:
-            if cluster != None:
-                url_cluster = server_details + resource_url_path +  "clusters?name=" + cluster
-                cluster_key = get_resource_key(url_cluster)
-                if cluster_key == None:
-                    module.exit_json(changed=False,meta="Please provide a valid Cluster name.")
-            else:
-                    module.exit_json(changed=False,meta="Please provide a Cluster name.")
             url_svm = server_details + resource_url_path +  "svms?cluster_key=" + cluster_key
             svm_key = parse_for_resource_key(url_svm, svm)
             if svm_key ==None:
                 module.exit_json(changed=False,meta="Please provide a valid SVM name.")
-	    url_active_directory = server_details + resource_url_path +  "active-directories?svm_key=" + svm_key
-	    active_directory_key = get_resource_key(url_active_directory)
-	    if active_directory_key == None:
+            url_active_directory = server_details + resource_url_path +  "active-directories?svm_key=" + svm_key
+            active_directory_key = get_resource_key(url_active_directory)
+            if active_directory_key == None:
                 module.exit_json(changed=False,meta="Please provide a SVM having active directory configured.")
-            payload['active_directory_key']= active_directory_key
+            access_control['active_directory_key']= active_directory_key
         if aggregate != None:
             url_aggregate = server_details + resource_url_path +  "aggregates?cluster_key=" + cluster_key
             aggregate_key = parse_for_resource_key(url_aggregate, aggregate)
@@ -405,39 +417,50 @@ class NetAppNSLMFileshares(object):
             if storage_efficiency_policy_uuid == None:
                 module.exit_json(changed=False,meta="Please provide a valid Storage efficiency policy name.")
             payload['storage_efficiency_policy_uuid']=storage_efficiency_policy_uuid
-        if permission != None:
-            acl_payload['permission']= permission
-        if user_or_group != None:
-            acl_payload['user_or_group']= user_or_group
-        if acl_payload :
-            acl.append(acl_payload)
-            access_control['acl']= acl
-        if allowed_clients != None:
-            rules_payload['allowed_clients']=allowed_clients
-        if cifs != None:
-            rules_payload['cifs']=cifs
-        if index != None:
-            rules_payload['index']=index
-        if nfsv3 != None:
-            rules_payload['nfsv3']=nfsv3
-        if nfsv4 != None:
-            rules_payload['nfsv4']=nfsv4
+        if permission != None and user_or_group != None:
+            if len(permission) == len(user_or_group):
+                for i in range(0,len(permission)):
+                    acl.append({"permission":permission[i], "user_or_group":user_or_group[i]})
+                access_control['acl']= acl
+            else:
+                module.exit_json(changed=False,meta="Every user_or_group should have a corresponding permission specified and vice versa.")
+        elif permission != None or user_or_group != None:
+               module.exit_json(changed=False,meta="Both user_or_group and permission should be specified.")
         if read_only_rule != None:
-            for read_only in read_only_rule:
-                read_only_rule_list.append(read_only)
-            rules_payload['read_only_rule']=read_only_rule_list
+            read_only_rule_list = read_only_rule.split(';')
+            read_only_rule_lists = [i.split(",") for i in read_only_rule_list]
         if read_write_rule != None:
-            for read_write in read_write_rule:
-                read_write_rule_list.append(read_write)
-            rules_payload['read_write_rule']=read_write_rule_list
-        if rules_payload:
-            rules.append(rules_payload)
-            export_policy['rules']= rules
-            access_control['export_policy']=export_policy
+            read_write_rule_list = read_write_rule.split(';')
+            read_write_rule_lists = [i.strip(";").split(",") for i in read_write_rule_list]
+        if allowed_clients != None:
+            allowed_clients_list = allowed_clients.split(';')
+        if read_only_rule != None and read_write_rule != None and allowed_clients != None:
+            rules_count = len(allowed_clients_list)
+            if len(read_only_rule_lists) == len(read_write_rule_lists) == len(allowed_clients_list):
+                for i in range(0,rules_count):
+                    rules_payload={}
+                    rules_payload["read_only_rule"]=read_only_rule_lists[i]
+                    rules_payload["read_write_rule"]=read_write_rule_lists[i]
+                    rules_payload["allowed_clients"]=allowed_clients_list[i]
+                    if index != None and len(index)== rules_count:
+                        rules_payload["index"]=index[i]
+                    if cifs != None:
+                        rules_payload["cifs"]=cifs
+                    if nfsv3 != None:
+                        rules_payload["nfsv3"]=nfsv3
+                    if nfsv4 != None:
+                        rules_payload["nfsv4"]=nfsv4
+                    rules.append(rules_payload)
+                export_policy['rules']= rules
+                access_control['export_policy']=export_policy
+            else:
+                module.exit_json(changed=False,meta="Missing parameters in export policy rule. The number of parameters specified for read_only_rule, read_write_rule, allowed_clients should be equal.")
+        elif cifs != None or index != None or nfsv3 != None or nfsv4 != None or read_only_rule or read_write_rule or allowed_clients:
+               module.exit_json(changed=False,meta="Parameters: index, read_only_rule, read_write_rule, allowed_clients, must be provided for an Export Policy.")
         if access_control :
             payload['access_control']=access_control
         response = requests.post(server_details + url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
     def delete(self):
         global url_path
@@ -482,7 +505,6 @@ class NetAppNSLMFileshares(object):
                     module.exit_json(changed=False,meta="Please provide a valid Performance service level name.")
             payload.clear()
             payload['performance_service_level_uuid']=performance_service_level_uuid
-            module.log(msg='PSL PAYLOAD:'+str(payload))
             response = requests.patch(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
             if response.status_code == 202:
                 patch_response_key.append(response.json()[JOB_KEY])
@@ -502,54 +524,63 @@ class NetAppNSLMFileshares(object):
             else:
                 fail_response = response.json()
                 self.parse_patch_response(patch_response_key)
-        if permission != None:
-            acl_payload['permission']= permission
-        if user_or_group != None:
-            acl_payload['user_or_group']= user_or_group
-        if acl_payload :
-            acl.append(acl_payload)
-            access_control['acl']= acl
+        if permission != None and user_or_group != None:
+            if len(permission) == len(user_or_group):
+                for i in range(0,len(permission)):
+                    acl.append({"permission":permission[i], "user_or_group":user_or_group[i]})
+                access_control['acl']= acl
+            else:
+                module.exit_json(changed=False,meta="Every user_or_group should have a corresponding permission specified and vice versa.")
             payload.clear()
             payload['access_control']=access_control
-            module.log(msg='PSL PAYLOAD:'+str(payload))
             response = requests.patch(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
             if response.status_code == 202:
                 patch_response_key.append(response.json()[JOB_KEY])
             else:
                 fail_response = response.json()
                 self.parse_patch_response(patch_response_key)
-        if allowed_clients != None:
-            rules_payload['allowed_clients']=allowed_clients
-        if cifs != None:
-            rules_payload['cifs']=cifs
-        if index != None:
-            rules_payload['index']=index
-        if nfsv3 != None:
-            rules_payload['nfsv3']=nfsv3
-        if nfsv4 != None:
-            rules_payload['nfsv4']=nfsv4
+        elif permission != None or user_or_group != None:
+               module.exit_json(changed=False,meta="Both user_or_group and permission should be specified.")
         if read_only_rule != None:
-            for read_only in read_only_rule:
-                read_only_rule_list.append(read_only)
-            rules_payload['read_only_rule']=read_only_rule_list
+            read_only_rule_list = read_only_rule.split(';')
+            read_only_rule_lists = [i.strip(";").split(",") for i in read_only_rule_list]
         if read_write_rule != None:
-            for read_write in read_write_rule:
-                read_write_rule_list.append(read_write)
-            rules_payload['read_write_rule']=read_write_rule_list
-        if rules_payload:
-            rules.append(rules_payload)
-            export_policy['rules']= rules
-            access_control.clear()
-            access_control['export_policy']=export_policy
-            payload.clear()
-            payload['access_control']=access_control
-            module.log(msg='PSL PAYLOAD:'+str(payload))
-            response = requests.patch(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-            if response.status_code == 202:
-                patch_response_key.append(response.json()[JOB_KEY])
+            read_write_rule_list = read_write_rule.split(';')
+            read_write_rule_lists = [i.strip(";").split(",") for i in read_write_rule_list]
+        if allowed_clients != None:
+            allowed_clients_list = allowed_clients.split(';')
+        if read_only_rule != None and read_write_rule != None and allowed_clients != None:
+            rules_count = len(allowed_clients_list)
+            if len(read_only_rule_lists) == len(read_write_rule_lists) == len(allowed_clients_list):
+                for i in range(0,rules_count):
+                    rules_payload={}
+                    rules_payload["read_only_rule"]=read_only_rule_lists[i]
+                    rules_payload["read_write_rule"]=read_write_rule_lists[i]
+                    rules_payload["allowed_clients"]=allowed_clients_list[i]
+                    if index != None and len(index)== rules_count:
+                        rules_payload["index"]=index[i]
+                    if cifs != None:
+                        rules_payload["cifs"]=cifs
+                    if nfsv3 != None:
+                        rules_payload["nfsv3"]=nfsv3
+                    if nfsv4 != None:
+                        rules_payload["nfsv4"]=nfsv4
+                    rules.append(rules_payload)
+                export_policy['rules']= rules
+                access_control.clear()
+                access_control['export_policy']=export_policy
+                payload.clear()
+                payload['access_control']=access_control
+                response = requests.patch(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
+                if response.status_code == 202:
+                    patch_response_key.append(response.json()[JOB_KEY])
+                else:
+                    fail_response = response.json()
+                    self.parse_patch_response(patch_response_key)
             else:
-                fail_response = response.json()
-                self.parse_patch_response(patch_response_key)
+                module.exit_json(changed=False,meta="Missing parameters in export policy rule. The number of parameters specified for index, read_only_rule, read_write_rule, allowed_clients should be equal.")
+        elif cifs != None or index != None or nfsv3 != None or nfsv4 != None or read_only_rule or read_write_rule or allowed_clients:
+               module.exit_json(changed=False,meta="Parameters: index, read_only_rule, read_write_rule, allowed_clients, must be provided for an Export Policy.")
         if operational_state != None:
             payload.clear()
             payload['operational_state']=operational_state
@@ -642,13 +673,12 @@ def get_resource_key(url):
     response = requests.get(url, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
     if(response.status_code==200):
         response_json = response.json()
-        if (response_json.get('num_records') == 0) :
+        if response_json.get('num_records') == 0 :
             return None
-        else:
-            embedded = response_json.get('_embedded')
-            for record in embedded['netapp:records']:
-                resource_key = record.get('key')
-                return resource_key
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            resource_key = record.get('key')
+            return resource_key
     else:
         # Returning error message received from NSLM
         module.exit_json(changed=False,meta=response.json())
@@ -658,6 +688,8 @@ def parse_for_resource_key(url, resource_name):
     if(response.status_code==200):
         unique_id=None
         response_json = response.json()
+        if response_json.get('num_records') == 0 :
+            return None
         embedded = response_json.get('_embedded')
         for record in embedded['netapp:records']:
             if record.get('name') == resource_name:

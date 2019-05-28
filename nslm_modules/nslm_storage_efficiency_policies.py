@@ -43,6 +43,11 @@ options:
     - Name of the storage-efficiency-policy.
     required: true
     state_supported: present,absent
+  rename:
+    description:
+    - New name of the performance-service-level, to change. Modifiable field.
+    required: false
+    state_supported: present
   space_thin_provisioned:
     description:
     - Specifies whether to use thin-provisioning for space. Modifiable field.
@@ -113,6 +118,7 @@ class NetAppNSLMStorageEfficiencyPolicies(object):
                              "type": "str"},
             "description" : {"required": False, "type": "str"},
             "space_thin_provisioned" : {"required": False, "type": "bool"},
+            "rename" : {"required": False, "type": "str"},
             }
 
         global module
@@ -158,6 +164,7 @@ class NetAppNSLMStorageEfficiencyPolicies(object):
         global description
         global name
         global space_thin_provisioned
+        global rename
         global uuid
 
         compression               = module.params["compression"]
@@ -165,7 +172,7 @@ class NetAppNSLMStorageEfficiencyPolicies(object):
         description               = module.params["description"]
         name                      = module.params["name"]
         space_thin_provisioned    = module.params["space_thin_provisioned"]
-
+        rename                    = module.params["rename"]
 
     def post(self):
         global url_path
@@ -181,7 +188,7 @@ class NetAppNSLMStorageEfficiencyPolicies(object):
         if space_thin_provisioned != None:
             payload['space_thin_provisioned']=space_thin_provisioned
         response = requests.post(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def delete(self):
@@ -211,11 +218,13 @@ class NetAppNSLMStorageEfficiencyPolicies(object):
             payload['description']=sep_json['description']
         if name != None:
             payload['name']=name
+        if rename != None:
+            payload['name']=rename
         if space_thin_provisioned != None:
             payload['space_thin_provisioned']=space_thin_provisioned
         url_path+="/"+uuid
         response = requests.put(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def apply(self):
@@ -281,6 +290,8 @@ def parse_for_resource_key(url, resource_name):
     if response.status_code==200:
         unique_id=None
         response_json = response.json()
+        if response_json.get('num_records') == 0:
+            return None
         embedded = response_json.get('_embedded')
         for record in embedded['netapp:records']:
             if record.get('name') == resource_name:

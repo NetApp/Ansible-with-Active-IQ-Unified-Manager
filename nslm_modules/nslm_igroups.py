@@ -199,7 +199,7 @@ class NetAppNSLMIgroups(object):
         if type != None:
             payload['type']= type
         response = requests.post(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
     def delete(self):
         global url_path
@@ -221,7 +221,7 @@ class NetAppNSLMIgroups(object):
             payload['os_type']=os_type
         url_path+="/"+key
         response = requests.patch(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def apply(self):
@@ -248,13 +248,13 @@ def exist ():
         cluster_key = get_resource_key(url_cluster)
         if cluster_key == None:
             module.exit_json(changed=False,meta="Please provide a valid Cluster name.")
-        url_svm = server_details + resource_url_path + "svms?filter=cluster eq "+cluster_key
-        svm_key = parse_for_resource_key(url_svm, svm)
+        url_svm = server_details + resource_url_path + "svms?cluster_key="+cluster_key + "&filter=name eq " + svm
+        svm_key = get_resource_key(url_svm)
         if svm_key == None:
             module.exit_json(changed=False,meta="Please provide a valid SVM name.")
         url_igroup = server_details + resource_url_path + resource_name + "?svm_key="+svm_key
         key = parse_for_resource_key(url_igroup, name)
-        if (key == None):
+        if key == None:
             return False
         return True
     else:
@@ -297,13 +297,12 @@ def get_resource_key(url):
     response = requests.get(url, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
     if(response.status_code==200):
         response_json = response.json()
-        if (response_json.get('num_records') == 0) :
+        if response_json.get('num_records') == 0:
             return None
-        else:
-            embedded = response_json.get('_embedded')
-            for record in embedded['netapp:records']:
-                resource_key = record.get('key')
-                return resource_key
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            resource_key = record.get('key')
+            return resource_key
     else:
         # Returning error message received from NSLM
         module.exit_json(changed=False,meta=response.json())
@@ -313,6 +312,8 @@ def parse_for_resource_key(url, resource_name):
     if(response.status_code==200):
         unique_id=None
         response_json = response.json()
+        if response_json.get('num_records') == 0:
+            return None
         embedded = response_json.get('_embedded')
         for record in embedded['netapp:records']:
             if record.get('name') == resource_name:

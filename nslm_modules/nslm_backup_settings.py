@@ -31,7 +31,7 @@ options:
     description:
     - Frequency at which a database backup is scheduled. Among possible values, NONE implies that backup is not scheduled.  Modifiable field.
     choices: ['daily', 'weekly', 'none']
-    required: true
+    required: false
     state_supported: present
   hour:
     description:
@@ -46,12 +46,12 @@ options:
   path:
     description:
     - Path to the location where backup files are stored.  Modifiable field.
-    required: true
+    required: false
     state_supported: present
   retention_count:
     description:
     - Maximum number of backup files to be retained.  Modifiable field.
-    required: true
+    required: false
     state_supported: present
 '''
 
@@ -61,7 +61,7 @@ EXAMPLES = '''
       nslm_backup_settings:
         hostip=<nslm_hostip>
         port=<nslm_portnumber>
-        user=<nslm_username>
+        user=<nslm_retention_count>
         password=<nslm_password>
         state=present
         frequency=none
@@ -185,7 +185,7 @@ class NetAppNSLMBackupSettings(object):
         if retention_count != None:
             payload['retention_count']=retention_count
         response = requests.put(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
     def apply(self):
         # Actions

@@ -57,6 +57,11 @@ options:
     - Maximum number of IOPS, per terabyte (TB) of storage space, that a client can perform on the storage object where this performance-service-level is applied. Modifiable field.
     required: false
     state_supported: present
+  rename:
+    description:
+    - New name of the performance-service-level, to change. Modifiable field.
+    required: false
+    state_supported: present
 '''
 
 EXAMPLES = '''
@@ -121,6 +126,7 @@ class NetAppNSLMPSLs(object):
             "expected_latency" : {"required": False, "type": "int"},
             "peak_iops_allocation_policy" : {"required": False, "type": "str"},
             "peak_iops_per_tb" : {"required": False, "type": "int"},
+            "rename" : {"required": False, "type": "str"},
             }
 
         global module
@@ -168,6 +174,7 @@ class NetAppNSLMPSLs(object):
         global name
         global peak_iops_allocation_policy
         global peak_iops_per_tb
+        global rename
         global uuid
 
         absolute_min_iops           = module.params["absolute_min_iops"]
@@ -177,6 +184,7 @@ class NetAppNSLMPSLs(object):
         name                        = module.params["name"]
         peak_iops_allocation_policy = module.params["peak_iops_allocation_policy"]
         peak_iops_per_tb            = module.params["peak_iops_per_tb"]
+        rename                      = module.params["rename"]
 
     def post(self):
         global resource_url_path
@@ -197,7 +205,7 @@ class NetAppNSLMPSLs(object):
         if description != None:
             payload['description'] = description
         response = requests.post(server_details + url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def delete(self):
@@ -215,17 +223,19 @@ class NetAppNSLMPSLs(object):
             payload['expected_iops_per_tb'] = expected_iops_per_tb
         if expected_latency != None:
             payload['expected_latency'] = expected_latency
-        if name != None:
-            payload['name']=name
         if peak_iops_allocation_policy != None:
             payload['peak_iops_allocation_policy'] = peak_iops_allocation_policy
         if peak_iops_per_tb != None:
             payload['peak_iops_per_tb'] = peak_iops_per_tb
         if description != None:
             payload['description'] = description
+        if name != None:
+            payload['name']=name
+        if rename != None:
+            payload['name']=rename
         url_path += "/" + uuid
         response = requests.put(server_details + url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
     def apply(self):
         # Actions
@@ -289,6 +299,8 @@ def parse_for_resource_key(url, resource_name):
     if response.status_code==200:
         unique_id=None
         response_json = response.json()
+        if response_json.get('num_records') == 0:
+            return None
         embedded = response_json.get('_embedded')
         for record in embedded['netapp:records']:
             if record.get('name') == resource_name:

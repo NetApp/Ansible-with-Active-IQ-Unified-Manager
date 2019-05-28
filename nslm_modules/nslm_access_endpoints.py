@@ -64,7 +64,7 @@ options:
     state_supported: present
   name:
     description:
-    - Name of access endpoint. If not provided then it auto generates the name.
+    - Name of access endpoint. If ip_address and ha_ip_address both are provided then the name is assigned to the LIF on LUN's home node and LIF on partner node is created with suffix "Partner". e.g. if "Lif1" is created on home node than the LIF on partner node will be  "Lif1_Partner". If either of ip_address or ha_ip_address is provided then the name is assigned to LIF on respective node.
     required: true
     state_supported: present,absent
   netmask:
@@ -281,7 +281,7 @@ class NetAppNSLMAccessendpoints(object):
         if vlan != None:
             payload['vlan']= vlan
         response = requests.post(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
     def delete(self):
         global url_path
@@ -299,7 +299,7 @@ class NetAppNSLMAccessendpoints(object):
         if ip_address != None:
             payload['ip_address']=ip_address
         response = requests.patch(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def apply(self):
@@ -325,12 +325,12 @@ def exist ():
     cluster_key = get_resource_key(url_cluster)
     if cluster_key == None:
         module.exit_json(changed=False,meta="Please provide a valid Cluster name.")
-    url_svm = server_details + resource_url_path + "svms?filter=cluster eq "+cluster_key
-    svm_key = parse_for_resource_key(url_svm, svm)
+    url_svm = server_details + resource_url_path + "svms?cluster_key="+cluster_key + "&filter=name eq " + svm
+    svm_key = get_resource_key(url_svm)
     if svm_key == None:
         module.exit_json(changed=False,meta="Please provide a valid SVM name.")
-    url_ad = server_details + url_path + "?resource_key="+svm_key
-    key = parse_for_resource_key(url_ad, name)
+    url_aep = server_details + url_path + "?resource_key="+svm_key
+    key = parse_for_resource_key(url_aep, name)
     if (key == None):
         return False
     return True
@@ -373,11 +373,10 @@ def get_resource_key(url):
         response_json = response.json()
         if (response_json.get('num_records') == 0) :
             return None
-        else:
-            embedded = response_json.get('_embedded')
-            for record in embedded['netapp:records']:
-                resource_key = record.get('key')
-                return resource_key
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            resource_key = record.get('key')
+            return resource_key
     else:
         # Returning error message received from NSLM
         module.exit_json(changed=False,meta=response.json())
@@ -389,14 +388,13 @@ def parse_for_resource_key(url, resource_name):
         response_json = response.json()
         if (response_json.get('num_records') == 0) :
             return None
-        else:
-            embedded = response_json.get('_embedded')
-            for record in embedded['netapp:records']:
-                if record.get('name') == resource_name:
-                    if record.get('key') != None:
-                        unique_id = record.get('key')
-                    else:
-                        unique_id = record.get('uuid')
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            if record.get('name') == resource_name:
+                if record.get('key') != None:
+                    unique_id = record.get('key')
+                else:
+                    unique_id = record.get('uuid')
         if unique_id == None:
             return None
         else:

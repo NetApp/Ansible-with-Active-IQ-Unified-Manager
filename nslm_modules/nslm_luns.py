@@ -91,8 +91,8 @@ options:
     state_supported: present,absent
   volume_name:
     description:
-    - Name of the parent volume, if exists then NSLM will use it as a parent volume for the LUN else NSLM will create a parent volume as NSLM_<volume-name> for the LUN.
-    required: true
+    - Name of the parent volume.When not provided defaults to NSLM_vol_<name>(where name is LUN name).If passed then NSLM will use it as a parent volume.
+    required: false
     state_supported: present, absent
 '''
 
@@ -164,7 +164,6 @@ class NetAppNSLMLUNs(object):
             "cluster" : {"required": True, "type": "str"},
             "name" : {"required": True, "type": "str"},
             "svm" : {"required": True, "type": "str"},
-            "volume_name": {"required": True, "type": "str"},
             "aggregate" : {"required": False, "type": "str"},
             "capacity" : {"required": False, "type": "float"},
             "capacity_unit" : {"required": False,
@@ -177,6 +176,7 @@ class NetAppNSLMLUNs(object):
             "os_type" : {"required": False, "type": "str"},
             "performance_service_level" : {"required": False, "type": "str"},
             "storage_efficiency_policy" : {"required": False, "type": "str"},
+            "volume_name": {"required": False, "type": "str"},
             }
 
         global module
@@ -254,6 +254,10 @@ class NetAppNSLMLUNs(object):
         svm                       = module.params["svm"]
         volume_name               = module.params["volume_name"]
 
+        # forming volume name in case user has not passed anything
+        if volume_name == None:
+            volume_name = "vol_"+name
+
         # converting capacity_unit to mb to feed NSLM server
         if capacity_unit != None:
             capacity_in_mb = capacity * self._capacity_unit_map[capacity_unit]
@@ -287,8 +291,8 @@ class NetAppNSLMLUNs(object):
             payload['aggregate_key']=aggregate_key
         if svm != None:
             # get svm key for the given svm name
-            url_svm = server_details + resource_url_path +  "svms?cluster_key=" + cluster_key
-            svm_key = parse_for_resource_key(url_svm, svm)
+            url_svm = server_details + resource_url_path +  "svms?cluster_key=" + cluster_key + "&filter=name eq " + svm
+            svm_key = get_resource_key(url_svm)
             if (svm_key == None):
                 module.exit_json(changed=False,meta="Please provide a valid SVM name.")
             payload['svm_key']= svm_key
@@ -323,6 +327,12 @@ class NetAppNSLMLUNs(object):
                 url_lun = server_details + url_path + "?filter=cluster eq "+cluster +", svm eq "+svm +", volume eq "+nslm_volume_name
                 nslm_volume_key = fetch_volume_key(url_lun, nslm_volume_name)
 
+                #checking the case where user has created a LUN without volume name and trying to create another LUN in same volume
+                # by passing the volume name as an input
+                if nslm_volume_key == None:
+                    url_lun = server_details + url_path + "?filter=cluster eq "+cluster +", svm eq "+svm +", volume eq "+volume_name
+                    nslm_volume_key = fetch_volume_key(url_lun, volume_name)
+
             if nslm_volume_key != None:
                 volume_key = nslm_volume_key
             else:
@@ -346,7 +356,7 @@ class NetAppNSLMLUNs(object):
             lun_maps.append(lunmap_payload.copy())
             payload['lun_maps']=lun_maps
         response = requests.post(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def delete(self):
@@ -416,7 +426,7 @@ class NetAppNSLMLUNs(object):
             module.exit_json(changed=False,meta="Please provide a igroup name.")
         # fetching igroup name from NSLM by GET on igroup key
         if 'lun_maps' in lun_json:
-            url_igroup = resource_url_path + "igroups/"+lun_json['lun_maps']['igroup_key']
+            url_igroup = resource_url_path + "igroups/"+lun_json['lun_maps'][0]['igroup']['key']
             igroup_response = requests.get(server_details+url_igroup, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
             igroup_name = igroup_response.json()['name']
         if igroup != None and igroup != igroup_name:
@@ -424,8 +434,8 @@ class NetAppNSLMLUNs(object):
             url_cluster = server_details + resource_url_path +  "clusters?name=" + cluster
             cluster_key = get_resource_key(url_cluster)
             # fetching svm_key for igroup
-            url_svm = server_details + resource_url_path +  "svms?cluster_key=" + cluster_key
-            svm_key = parse_for_resource_key(url_svm, svm)
+            url_svm = server_details + resource_url_path +  "svms?cluster_key=" + cluster_key + "&filter=name eq " + svm
+            svm_key = get_resource_key(url_svm)
             # fetching igroup_key for given igroup name
             url_igroup = server_details + resource_url_path +  "igroups?svm_key=" + svm_key
             igroup_key = parse_for_resource_key(url_igroup, igroup)
@@ -454,7 +464,7 @@ class NetAppNSLMLUNs(object):
                 fail_response = response.json()
                 self.parse_patch_response(patch_response_key)
 
-	return patch_response_key
+        return patch_response_key
 
     def parse_patch_response(self, response):
         """ check the patch response body for all the jobs and take necessary action according to status code """
@@ -517,14 +527,14 @@ def parse_state_response(response):
     if response.status_code==202:
         job_key = response.json()[JOB_KEY]
         job_response = get_job_status(job_key)
-        module.exit_json(changed=True, failed=False, meta=job_response)
+        module.exit_json(changed=True,meta=job_response)
     elif response.status_code==200:
-        module.exit_json(changed=True, failed=False, meta="job successful")
+        module.exit_json(changed=True,meta="job successful")
     elif response.status_code==201:
         module.exit_json(changed=True,meta=response.json())
     else:
         # Returning error message received from NSLM
-        module.exit_json(changed=False, failed=True, meta=response.json())
+        module.exit_json(changed=False,meta=response.json())
 
 def get_job_status(job_key):
     """ verify job status and wait for job to complete """
@@ -550,11 +560,10 @@ def get_resource_key(url):
         response_json = response.json()
         if response_json.get('num_records') == 0:
             return None
-        else:
-            embedded = response_json.get('_embedded')
-            for record in embedded['netapp:records']:
-                resource_key = record.get('key')
-                return resource_key
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            resource_key = record.get('key')
+            return resource_key
     else:
         # Returning error message received from NSLM
         module.exit_json(changed=False,meta=response.json())
@@ -564,6 +573,8 @@ def parse_for_resource_key(url, resource_name):
     if response.status_code==200:
         unique_id=None
         response_json = response.json()
+        if response_json.get('num_records') == 0:
+            return None
         embedded = response_json.get('_embedded')
         for record in embedded['netapp:records']:
             if record.get('name') == resource_name:
