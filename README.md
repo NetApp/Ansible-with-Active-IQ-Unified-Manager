@@ -7,12 +7,13 @@ This document contains best practices for Ansible modules and sample playbooks, 
 
 # Repository includes:
 1.	Ansible modules for SLM 
-2.	Sample playbooks (part of module documentation)
+2.	Sample playbooks
 3.	README file
  
 # Supported configurations:
-1.	NetApp Service Level Manager version 1.2 general availability (GA) 
+1.	NetApp Service Level Manager version 1.3 RC1 
 2.	Ansible version 2.7.0
+3. Python version 2.7.0, 3.5.0, 3.6.0
 
 
 # Overview
@@ -24,7 +25,7 @@ You can download the modules on your Ansible server using the following configur
 # Configuration
 ## Prerequisites
 1.	Ansible must be setup (RHEL-7)     
-2.	NetApp Service Level Manager version 1.2 GA must be installed and working
+2.	NetApp Service Level Manager version 1.3 RC1 must be installed and working
 
  ## Steps
 1.	Log in as root at both the Ansible Master machine and the Ansible Slave servers.
