@@ -167,6 +167,7 @@ class NetAppNSLMSVMs(object):
         global cluster_key
         global ip_space_name
         global isPost
+        global isDelete
         global key
         global name
         global root_volume_aggregate
@@ -183,6 +184,7 @@ class NetAppNSLMSVMs(object):
         root_volume_security_style = module.params["root_volume_security_style"]
 
         isPost = 0
+        isDelete = 0
 
     def post(self):
         global url_path
@@ -211,13 +213,12 @@ class NetAppNSLMSVMs(object):
             payload['root_volume_security_style']=root_volume_security_style
 
         response = requests.post(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, data=json.dumps(payload),headers=HEADERS)
-	return response
+        return response
 
 
     def delete(self):
-        global url_path
-        url_path += "/"+key
-        response = requests.delete(server_details+url_path, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
+        url = url_path+"/"+key
+        response = requests.delete(server_details+url, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
         return response
 
     def patch(self):
@@ -261,7 +262,7 @@ class NetAppNSLMSVMs(object):
                 fail_response = response.json()
                 self.parse_patch_response(patch_response_key)
 
-	return patch_response_key
+        return patch_response_key
 
     def parse_patch_response(self, response):
         """ check the patch response body for all the jobs and take necessary action according to status code """
@@ -282,8 +283,10 @@ class NetAppNSLMSVMs(object):
     def apply(self):
         # Actions
         global isPost
+        global isDelete
         if module.params["state"] == ABSENT:
             if exist():
+                isDelete = 1
                 response = self.delete()
                 parse_state_response(response)
             else:
@@ -305,12 +308,11 @@ def exist ():
         cluster_key = get_resource_key(url_cluster)
         if cluster_key == None:
             module.exit_json(changed=False,meta="Please provide a valid Cluster name.")
-        url_svm = server_details + resource_url_path + resource_name+"?cluster_key="+cluster_key
-        key = parse_for_resource_key(url_svm, name)
+        url_svm = server_details + resource_url_path + resource_name+"?cluster_key="+cluster_key + "&filter=name eq " + name
+        key = get_resource_key(url_svm)
         if (key == None):
             return False
         return True
-
     else:
         return False
 
@@ -321,6 +323,10 @@ def parse_state_response(response):
         job_key = response.json()['job_key']
         if isPost:
             job_response=get_post_job_status(job_key)
+        elif isDelete:
+            job_response=get_job_status(job_key)
+            if job_response['state'] == JOB_STATUS and job_response['status'] == 'NORMAL':
+                acquisition_delete()
         else:
             job_response=get_job_status(job_key)
         module.exit_json(changed=True,meta=job_response)
@@ -362,7 +368,7 @@ def get_post_job_status(job_key):
             if (job_response['state'] == JOB_STATUS) :
                 if(job_response['status'] == 'NORMAL'):
                     key = get_key_from_job(job_response)
-                    acquisition_check(key)
+                    acquisition_post(key)
                 break
             RETRY_COUNT -= 1
             time.sleep(1)
@@ -373,11 +379,11 @@ def get_post_job_status(job_key):
 
 def get_key_from_job(json_response):
     for job_results in json_response['job_results']:
-        if (job_results.get('name') == "key"):
+        if (job_results.get('name') == "svmKey"):
             key = job_results.get('value')
             return key
 
-def acquisition_check(key):
+def acquisition_post(key):
     global json_response
     global url_path
     url = server_details+url_path+'/'+key
@@ -389,17 +395,34 @@ def acquisition_check(key):
         json_response = response.json()
     return
 
+def acquisition_delete():
+    key_present = 1
+    url_svm = server_details +url_path
+    while(key_present):
+        response = requests.get(url_svm, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
+        if(response.status_code==200):
+            response_json = response.json()
+            if response_json.get('num_records') != 0:
+                embedded = response_json.get('_embedded')
+                if any(record['key'] == key for record in embedded['netapp:records']):
+                    time.sleep(10)
+                else:
+                    key_present = 0
+        else:
+            # Returning error message received from NSLM
+            module.exit_json(changed=False,meta=response.json())
+    return
+
 def get_resource_key(url):
     response = requests.get(url, auth=(api_user_name,api_user_password), verify=False, headers=HEADERS)
     if(response.status_code==200):
         response_json = response.json()
-        if (response_json.get('num_records') == 0) :
+        if response_json.get('num_records') == 0:
             return None
-        else:
-            embedded = response_json.get('_embedded')
-            for record in embedded['netapp:records']:
-                resource_key = record.get('key')
-                return resource_key
+        embedded = response_json.get('_embedded')
+        for record in embedded['netapp:records']:
+            resource_key = record.get('key')
+            return resource_key
     else:
         # Returning error message received from NSLM
         module.exit_json(changed=False,meta=response.json())
@@ -409,6 +432,8 @@ def parse_for_resource_key(url, resource_name):
     if(response.status_code==200):
         unique_id=None
         response_json = response.json()
+        if response_json.get('num_records') == 0:
+            return None
         embedded = response_json.get('_embedded')
         for record in embedded['netapp:records']:
             if record.get('name') == resource_name:
