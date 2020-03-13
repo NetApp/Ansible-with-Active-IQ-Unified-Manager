@@ -1,0 +1,29 @@
+- hosts: localhost
+# Make sure AIQUM credentials are updated in aiqum_credentials.yml file before trying this playbook
+  vars_files: aiqum_credentials.yml
+  vars:
+      state: present
+      cluster: <cluster_name>
+      svm: <svm_name>
+      filesharename: <name_of_the_file_share>
+      psl: <performance_servive_level>
+      sep: <storage_efficiency_policy>
+
+  tasks:
+    - name: Assign specified performance service level and/or storage effieiciency policy for a FileShare
+      aiqum_file_shares:
+        state={{ state }}
+        hostip={{ aiqumIP }}
+        port={{ aiqumPort }}
+        user={{ aiqumUser }}
+        password={{ aiqumPassword }}
+        cluster={{ cluster }}
+        svm={{ svm }}
+        name={{ filesharename }}
+        performance_service_level={{ psl }}
+        storage_efficiency_policy={{ sep }}
+      no_log: true
+      register: fileshareAssign
+
+    - name: Print the fileshare job key
+      debug: msg="Assigning a performce service level and storage efficiency policy {{fileshareAssign["meta"]}}"

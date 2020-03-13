@@ -1,0 +1,37 @@
+- hosts: localhost
+# Make sure AIQUM credentials are updated in aiqum_credentials.yml file before trying this playbook
+  vars_files: aiqum_credentials.yml
+  vars:
+      psl: <performance_servive_level>
+      cluster: <cluster_name>
+      svm: <svm_name>
+      state: present # Possible values are present, absent
+      filesharename: <name_of_the_file_share>
+      filesharesize: <size_of_the_file_share>
+      sizeunit: MB # Possible values are B,KB,MB,GB,TB,PB
+      mountpoint: <file_share_mount_point>
+      permission: FULL_CONTROL # Possible values are NO_CCESS,READ,CHANGE,FULL_CONTROL or no_access, read, change, full_control
+      user_or_group: <user_or_group_of_the_Active_Directory>
+
+  tasks:
+    - name: Manage a CIFS Share with specified Performance Service Level by the name
+      aiqum_file_shares:
+        state={{ state }}
+        hostip={{ aiqumIP }}
+        port={{ aiqumPort }}
+        user={{ aiqumUser }}
+        password={{ aiqumPassword }}
+        cluster={{ cluster }}
+        svm={{ svm }}
+        performance_service_level={{ psl }}
+        name={{ filesharename }}
+        capacity={{ filesharesize }}
+        capacity_unit={{ sizeunit }}
+        mountpoint={{ mountpoint }}
+        permission={{ permission }}
+        user_or_group={{ user_or_group }}
+      no_log: true
+      register: fileshareCreate
+
+    - name: Print the state of the operatio
+      debug: msg="Creation/Updation of FileShare in specified PSL {{fileshareCreate["meta"]["state"]}}"
