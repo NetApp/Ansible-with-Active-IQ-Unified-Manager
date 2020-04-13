@@ -62,3 +62,11 @@ ansible-doc aiqum_luns.py
 # Support
 Report any problems to: https://github.com/NetApp/Ansible-with-Active-IQ-Unified-Manager/issues
 Or please report it to the following mail id: *ng-aiqum-solutions@netapp.com*
+
+# Releases:
+## 9.7
+This release supports the Ansible modules compatible with Active IQ Unified Manager 9.7
+
+## 9.7U1
+This release provides a new Ansible module to manage clusters as a data source for Active IQ Unified Manager 9.7
+
