@@ -70,3 +70,8 @@ This release supports the Ansible modules compatible with Active IQ Unified Mana
 ## 9.7U1
 This release provides a new Ansible module to manage clusters as a data source for Active IQ Unified Manager 9.7
 
+## 9.7U2
+This release provides the updated modules list compatible with Active IQ Unified Manager 9.7
+
+## 9.8
+This release supports the Ansible modules compatible with Active IQ Unified Manager 9.8
